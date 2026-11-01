@@ -8,10 +8,13 @@ export function LogoMark() {
       strokeWidth="1.5"
       aria-hidden
     >
-      <circle cx="12" cy="12" r="9" opacity="0.9" />
-      <circle cx="12" cy="12" r="5" opacity="0.6" />
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-      <path d="M12 12 L12 3" strokeLinecap="round" opacity="0.85" />
+      <rect x="2.75" y="4.75" width="12.5" height="9.5" rx="2" opacity="0.45" />
+      <rect x="8.75" y="9.75" width="12.5" height="9.5" rx="2" />
+      <path
+        d="M13.15 12.85 L18.1 15.5 L13.15 18.15 Z"
+        fill="currentColor"
+        stroke="none"
+      />
     </svg>
   );
 }

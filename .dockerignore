@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.vercel
+.env
+.env.*
+app
+components
+lib
+public
+docs
+harness
+*.md
+*.ts
+*.tsx
+*.json
+!scripts/requirements-fetch.txt

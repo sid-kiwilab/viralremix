@@ -4,7 +4,7 @@ import { SiteShell } from "@/components/site-shell";
 const STEPS = [
   {
     title: "Video URL",
-    body: "Paste an Instagram Reel or TikTok link. Nothing is fetched yet.",
+    body: "Paste an Instagram Reel or TikTok link. Remix fetches the video and plays it in your browser for this session.",
   },
   {
     title: "Read the format",

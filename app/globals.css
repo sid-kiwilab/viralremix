@@ -382,6 +382,46 @@ button {
   flex-shrink: 0;
 }
 
+.ingest-message {
+  margin-top: 14px;
+  font-size: var(--nav);
+  line-height: 1.45;
+  max-width: var(--meta-max);
+}
+
+.ingest-message-error {
+  color: #ffb4b4;
+}
+
+.ingest-message-ok {
+  color: #c8e6c8;
+}
+
+.ingest-result {
+  width: 100%;
+  max-width: var(--meta-max);
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ingest-player {
+  width: 100%;
+  max-width: 360px;
+  max-height: min(68vh, 640px);
+  border-radius: 8px;
+  background: #000;
+  border: 1px solid rgba(198, 198, 198, 0.25);
+}
+
+.ingest-result code,
+.content-note code {
+  font-size: 0.92em;
+  color: #ddd;
+}
+
 .btn {
   position: relative;
   isolation: isolate;
