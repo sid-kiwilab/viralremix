@@ -1,0 +1,15 @@
+---
+description: Owner verifies localhost UI. Agent never opens or fetches localhost.
+alwaysApply: true
+---
+
+# Owner verifies the browser
+
+The owner checks localhost. The agent does not.
+
+- Do not open `localhost`, `127.0.0.1`, or the local Next port in the browser tools, computer-use, curl, fetch, or any other client.
+- Do not start a second `next dev` (or any local server) just to self-test the UI.
+- Do not screenshot, snapshot, or click the running app.
+- After a UI change, say what changed and that the owner should verify. Stop there.
+
+How it works stays in the header. That is enough for the owner to open `/how-it-works`.
