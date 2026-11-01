@@ -8,7 +8,7 @@ const STEPS = [
   },
   {
     title: "Read the format",
-    body: "Later: understand hook, structure, and what to remake. Not built.",
+    body: "After Fetch, Remix sends the clip to a video-capable model (OpenRouter + Gemini) and shows a recreatability score — hook, beats, and what today’s AI video can or cannot remake honestly.",
   },
   {
     title: "Remix",

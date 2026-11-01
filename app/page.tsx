@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RecreatabilityCard } from "@/components/recreatability-card";
 import { SiteShell } from "@/components/site-shell";
+import { ANALYZE_FETCH_TIMEOUT_MS } from "@/lib/analyze-constants";
 import { INGEST_FETCH_TIMEOUT_MS } from "@/lib/ingest-constants";
+import type { RecreatabilityAnalysis } from "@/lib/recreatability";
 
 type PreviewState = {
   platform: "instagram" | "tiktok";
@@ -10,25 +13,152 @@ type PreviewState = {
   playbackUrl: string;
 };
 
+type AnalyzeContext = {
+  url: string;
+  platform: "instagram" | "tiktok";
+  title: string | null;
+};
+
 export default function Home() {
   const [videoUrl, setVideoUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<RecreatabilityAnalysis | null>(
+    null,
+  );
+  const [analyzeBlobReady, setAnalyzeBlobReady] = useState(false);
+  const [analyzePending, setAnalyzePending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const analyzeAbortRef = useRef<AbortController | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const videoBlobRef = useRef<Blob | null>(null);
+  const analyzeContextRef = useRef<AnalyzeContext | null>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
+  const pendingAnalyzeBlobRef = useRef<Blob | null>(null);
+  const analyzeFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  function clearAnalyzeFallbackTimer() {
+    if (analyzeFallbackTimerRef.current !== null) {
+      clearTimeout(analyzeFallbackTimerRef.current);
+      analyzeFallbackTimerRef.current = null;
+    }
+  }
 
   function clearPreview() {
+    clearAnalyzeFallbackTimer();
+    analyzeAbortRef.current?.abort();
+    analyzeAbortRef.current = null;
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
+    videoBlobRef.current = null;
+    analyzeContextRef.current = null;
+    pendingAnalyzeBlobRef.current = null;
+    setAnalyzeBlobReady(false);
+    setAnalyzePending(false);
     setPreview(null);
+    setAnalysis(null);
+    setAnalyzeError(null);
+    setAnalyzeLoading(false);
   }
+
+  function cancelAnalyze() {
+    if (analyzePending) {
+      clearAnalyzeFallbackTimer();
+      pendingAnalyzeBlobRef.current = null;
+      setAnalyzePending(false);
+      return;
+    }
+    if (!analyzeLoading) return;
+    analyzeAbortRef.current?.abort();
+    analyzeAbortRef.current = null;
+    setAnalyzeLoading(false);
+    setAnalyzeError(null);
+  }
+
+  const runAnalyze = useCallback(async (blob: Blob) => {
+    analyzeAbortRef.current?.abort();
+    const controller = new AbortController();
+    analyzeAbortRef.current = controller;
+
+    setAnalyzePending(false);
+    setAnalyzeLoading(true);
+    setAnalyzeError(null);
+    setAnalysis(null);
+
+    const isActive = () =>
+      analyzeAbortRef.current === controller && !controller.signal.aborted;
+
+    const timeoutSignal = AbortSignal.timeout(ANALYZE_FETCH_TIMEOUT_MS);
+    const fetchSignal = AbortSignal.any([controller.signal, timeoutSignal]);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", blob, "video.mp4");
+
+      const ctx = analyzeContextRef.current;
+      if (ctx) {
+        formData.append("url", ctx.url);
+        formData.append("platform", ctx.platform);
+        if (ctx.title) formData.append("title", ctx.title);
+      }
+
+      const duration = videoPlayerRef.current?.duration;
+      if (typeof duration === "number" && Number.isFinite(duration) && duration > 0) {
+        formData.append("durationSec", String(duration));
+      }
+
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
+        signal: fetchSignal,
+      });
+
+      if (!isActive()) return;
+
+      if (response.status === 499) return;
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!isActive()) return;
+        setAnalyzeError(data.error ?? "Could not analyze this video.");
+        return;
+      }
+
+      const data = (await response.json()) as RecreatabilityAnalysis;
+      if (!isActive()) return;
+      setAnalysis(data);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (!isActive()) return;
+        if (controller.signal.aborted) return;
+        if (timeoutSignal.aborted) {
+          setAnalyzeError("Analysis took too long. Try fetching again.");
+        }
+        return;
+      }
+      if (!isActive()) return;
+      setAnalyzeError("Could not analyze this video. Try again.");
+    } finally {
+      if (analyzeAbortRef.current === controller) {
+        setAnalyzeLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
+      clearAnalyzeFallbackTimer();
       abortRef.current?.abort();
+      analyzeAbortRef.current?.abort();
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
       }
@@ -74,6 +204,8 @@ export default function Home() {
 
       const objectUrl = URL.createObjectURL(blob);
       blobUrlRef.current = objectUrl;
+      videoBlobRef.current = blob;
+      setAnalyzeBlobReady(true);
 
       const platformHeader = response.headers.get("X-Video-Platform");
       const platform =
@@ -86,11 +218,28 @@ export default function Home() {
         ? decodeURIComponent(titleHeader)
         : null;
 
+      analyzeContextRef.current = {
+        url: videoUrl.trim(),
+        platform,
+        title,
+      };
+
       setPreview({
         platform,
         title,
         playbackUrl: objectUrl,
       });
+
+      pendingAnalyzeBlobRef.current = blob;
+      setAnalyzePending(true);
+      clearAnalyzeFallbackTimer();
+      const blobForFallback = blob;
+      analyzeFallbackTimerRef.current = setTimeout(() => {
+        analyzeFallbackTimerRef.current = null;
+        if (pendingAnalyzeBlobRef.current !== blobForFallback) return;
+        pendingAnalyzeBlobRef.current = null;
+        void runAnalyze(blobForFallback);
+      }, 2500);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         if (!isActive()) return;
@@ -110,6 +259,31 @@ export default function Home() {
 
   const platformLabel =
     preview?.platform === "instagram" ? "Instagram Reel" : "TikTok";
+
+  const canRetryAnalyze =
+    Boolean(
+      preview &&
+        analyzeBlobReady &&
+        !analyzeLoading &&
+        !analyzePending &&
+        !analysis,
+    );
+
+  function retryAnalyze() {
+    const blob = videoBlobRef.current;
+    if (!blob || analyzeLoading) return;
+    clearAnalyzeFallbackTimer();
+    pendingAnalyzeBlobRef.current = null;
+    void runAnalyze(blob);
+  }
+
+  function onVideoMetadataLoaded() {
+    clearAnalyzeFallbackTimer();
+    const pending = pendingAnalyzeBlobRef.current;
+    if (!pending || analyzeLoading) return;
+    pendingAnalyzeBlobRef.current = null;
+    void runAnalyze(pending);
+  }
 
   return (
     <SiteShell isLanding>
@@ -177,15 +351,53 @@ export default function Home() {
                 {preview.title ? `: ${preview.title}` : ""}
               </p>
               <video
+                ref={videoPlayerRef}
                 className="ingest-player"
                 src={preview.playbackUrl}
                 controls
                 playsInline
                 preload="metadata"
+                onLoadedMetadata={onVideoMetadataLoaded}
               />
+              {analyzeLoading || analyzePending ? (
+                <div className="analyze-loading-card">
+                  <p className="analyze-loading-text">Reading the format…</p>
+                  <button
+                    type="button"
+                    className="analyze-cancel-btn"
+                    onClick={cancelAnalyze}
+                    aria-label="Cancel analysis"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
+              {analyzeError ? (
+                <p
+                  className="ingest-message ingest-message-error"
+                  role="alert"
+                >
+                  {analyzeError}
+                </p>
+              ) : null}
+              {canRetryAnalyze ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost analyze-retry-btn"
+                  onClick={retryAnalyze}
+                >
+                  Read format again
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
+
+        {analysis ? (
+          <div className="analysis-stage">
+            <RecreatabilityCard analysis={analysis} />
+          </div>
+        ) : null}
       </div>
     </SiteShell>
   );
