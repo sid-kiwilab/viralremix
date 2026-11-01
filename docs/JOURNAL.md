@@ -6,6 +6,17 @@ Newest entries at the top.
 
 ---
 
+## 2026-11-02: House avatar Luca (Avatars page)
+
+- **Shipped:** **Luca** in [`public/avatars/luca/`](../public/avatars/luca/) (full JPGs + [`profile-display.webp`](../public/avatars/luca/profile-display.webp) for UI). Catalog [`lib/characters.ts`](../lib/characters.ts): `role`, `consentLine`, `statusLine`, `generation` (profile, face, turnaround). [`/avatars`](../app/avatars/page.tsx): glass card, rounded portrait, mobile-friendly layout; header **Avatars** link. [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) rebuilds display WebP from `profile.jpg`. UI rule: [`.cursor/rules/no-ui-dividers.mdc`](../.cursor/rules/no-ui-dividers.mdc) (no section divider lines; whole-card outlines OK).
+- **Fix:** Catalog-driven tag/status; shorter lede; README regen command; removed unused lookup exports earlier in session.
+- **Key files:** `app/avatars/page.tsx`, `lib/characters.ts`, `app/globals.css`, `components/site-header.tsx`, `public/avatars/luca/*`, `scripts/optimize_avatar_display.py`, `README.md`, `.cursor/rules/no-ui-dividers.mdc`
+- **Gaps:** Remix does not read `generation` paths yet.
+- **Owner:** `/avatars` on phone + desktop — portrait corners, card, copy; hard-refresh after CSS changes.
+- **Harness:** PLAN → build → REVIEW → FIX → SYNC (this entry).
+
+---
+
 ## 2026-11-02: Beats list layout (recreatability card)
 
 - **Shipped:** Beats without leading timestamps (e.g. `0-2s:`) no longer reserve an empty timeline column; they render as the same dotted list used under **Remakes well**. Rows with timestamps still show the time column.

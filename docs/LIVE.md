@@ -15,7 +15,7 @@ Local dev: [README.md](../README.md). Session history: [JOURNAL.md](JOURNAL.md).
 | Stack | Next.js 16, React 19, Tailwind 4 |
 | App root | `app/` (no `src/`) |
 | Dev server | `npm run dev` or [`start.bat`](../start.bat) → **owner** verifies in browser. Agent never opens or fetches localhost. |
-| Routes | `/`, `/how-it-works`, `POST /api/ingest`, `POST /api/analyze` |
+| Routes | `/`, `/how-it-works`, `/avatars`, `POST /api/ingest`, `POST /api/analyze` |
 | Backend | Cloud Run `viralremix-fetch` (Docker + yt-dlp + curl_cffi + ffmpeg). Local Python only if `CLOUD_RUN_URL` is unset or whitespace. |
 | Cloud Run revision | `viralremix-fetch-00003-4xt` (redeploy after `fetch_server.py` / Dockerfile changes) |
 | GCP project | `viral-remix-app` (Firebase + Cloud Run) |
@@ -56,6 +56,7 @@ flowchart LR
 - **Fetch worker** ([`scripts/fetch_server.py`](../scripts/fetch_server.py) + [`Dockerfile`](../Dockerfile)): same URL path rules as [`lib/video-url.ts`](../lib/video-url.ts), Bearer secret, MP4 or JSON error. Public URL (`--allow-unauthenticated`); no app-level rate limit yet — rely on secret + `max-instances`.
 - **Ingest timeouts:** Shared [`INGEST_FETCH_TIMEOUT_MS`](../lib/ingest-constants.ts) = 290s on browser + upstream fetch. Cloud Run request timeout 300s; Next [`maxDuration`](../app/api/ingest/route.ts) 300s.
 - **How it works** ([`app/how-it-works/page.tsx`](../app/how-it-works/page.tsx)): steps 1–2 live; step 3 Remix stub.
+- **Avatars** ([`app/avatars/page.tsx`](../app/avatars/page.tsx)): **Luca** from [`lib/characters.ts`](../lib/characters.ts) — UI uses `profile-display.webp`; full assets under [`public/avatars/luca/`](../public/avatars/luca/) for future Remix (`generation.profile`, face, turnaround). Rebuild display file: [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) (Pillow). Not wired to Remix.
 - **Gitignore**: `.env*` (except example), `node_modules/`, `.next/`, `.vercel/`, legacy `/.data/`.
 
 ---
@@ -156,6 +157,10 @@ LIMIT 20;
 | [`components/logo-mark.tsx`](../components/logo-mark.tsx) | Header mark (orbital remix arc) |
 | [`app/icon.svg`](../app/icon.svg) | Tab icon (remix arc on dark tile) |
 | [`components/site-shell.tsx`](../components/site-shell.tsx) | Hero video + grain + header |
+| [`app/avatars/page.tsx`](../app/avatars/page.tsx) | House avatars (Luca) |
+| [`lib/characters.ts`](../lib/characters.ts) | Avatar catalog (`CHARACTERS`: role, consent, status, `profileSrc`, `generation.*`) |
+| [`public/avatars/luca/`](../public/avatars/luca/) | Luca assets: `profile-display.webp` (UI), `profile.jpg` + `face.jpg` + `turnaround.jpg` (generation) |
+| [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) | Regenerate `profile-display.webp` after `profile.jpg` changes |
 | [`start.bat`](../start.bat) | `npm run dev` |
 
 ---
@@ -169,7 +174,7 @@ npm run build
 npm run lint
 ```
 
-Owner verifies: **Fetch** a public Reel or TikTok → recreatability card; cancel mid-analyze and **Read format again**; `/how-it-works`, tab icon. Restart dev server after adding `OPENROUTER_API_KEY`. Confirm rows in Neon `analyze_runs` after a successful analyze. Agents do not fetch localhost.
+Owner verifies: **Fetch** a public Reel or TikTok → recreatability card; cancel mid-analyze and **Read format again**; `/how-it-works`, `/avatars` (desktop + phone), tab icon. Restart dev server after adding `OPENROUTER_API_KEY`. Confirm rows in Neon `analyze_runs` after a successful analyze. Agents do not fetch localhost.
 
 Failed downloads: Neon `ingest_errors` (`raw_error` is the yt-dlp/Cloud Run text).
 

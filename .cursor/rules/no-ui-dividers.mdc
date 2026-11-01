@@ -1,0 +1,13 @@
+---
+description: No horizontal or vertical divider lines in UI layout
+alwaysApply: true
+---
+
+# No UI dividers
+
+Do not use horizontal or vertical divider lines to separate content.
+
+- No `border-top`, `border-bottom`, `border-left`, or `border-right` used only to split sections or columns
+- No `<hr>` or pseudo-elements that draw separator lines between blocks
+- Use spacing, typography hierarchy, and grid gap instead
+- A single outline around a whole card or input is fine; lines *between* regions inside a page or card are not

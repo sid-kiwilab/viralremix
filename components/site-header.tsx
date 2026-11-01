@@ -34,6 +34,9 @@ export function SiteHeader({
         </a>
       )}
       <nav className="header-nav" aria-label="Site">
+        <Link href="/avatars" className="header-nav-link">
+          Avatars
+        </Link>
         <Link href="/how-it-works" className="header-nav-link">
           How it works
         </Link>

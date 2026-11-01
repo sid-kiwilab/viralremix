@@ -10,6 +10,7 @@ Sister of [Viral Radar](https://github.com/sid-kiwilab/viralradar): Radar finds 
 |-------|---------|
 | `/` | Landing — paste URL, **Fetch**, player, recreatability score card (720px block below player) |
 | `/how-it-works` | Flow (step 3 Remix not built) |
+| `/avatars` | House model **Luca** (profile only; not wired to Remix yet) |
 | `POST /api/ingest` | Proxy to Cloud Run fetch worker (or local Python if unset) |
 | `POST /api/analyze` | OpenRouter Gemini recreatability analysis (multipart MP4) |
 
@@ -30,7 +31,7 @@ npm run build
 npm run lint
 ```
 
-Owner verifies UI in the browser. Agents do not fetch localhost.
+Owner verifies UI in the browser (`/`, `/how-it-works`, `/avatars`). Agents do not fetch localhost.
 
 ## Environment variables
 
@@ -56,8 +57,10 @@ app/
   api/analyze/route.ts  # Recreatability analyze API
   icon.svg              # Tab icon (orbital remix arc)
   how-it-works/
+  avatars/page.tsx      # House model Luca (profile UI)
 components/             # Site shell, header, logo mark, recreatability card
 lib/
+  characters.ts         # Avatar catalog (role, profileSrc, generation asset paths)
   video-url.ts          # IG Reel / TikTok URL parsing
   ingest-error-log.ts   # Neon error rows
   ingest-constants.ts   # Fetch timeout (290s)
@@ -69,10 +72,18 @@ lib/
 scripts/
   fetch_video.py        # yt-dlp + curl_cffi download
   fetch_server.py       # Cloud Run HTTP wrapper
+  optimize_avatar_display.py  # Rebuild Luca profile-display.webp from profile.jpg
   requirements-fetch.txt
 Dockerfile              # Fetch worker (deploy: see docs/LIVE.md)
+public/avatars/luca/    # Luca assets (profile-display.webp for UI; full JPGs for Remix)
 docs/                   # LIVE, JOURNAL
 harness/                # PLAN, REVIEW, FIX, SYNC
+```
+
+After updating `public/avatars/luca/profile.jpg`, rebuild the UI portrait (requires Pillow: `pip install pillow`):
+
+```bash
+python scripts/optimize_avatar_display.py
 ```
 
 ## Docs
