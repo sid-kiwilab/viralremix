@@ -1,7 +1,7 @@
 import {
+  buildRecreatabilityUserPrompt,
   parseRecreatabilityAnalysis,
   RECREATABILITY_SYSTEM_PROMPT,
-  RECREATABILITY_USER_PROMPT,
   type RecreatabilityAnalysis,
 } from "@/lib/recreatability";
 
@@ -18,6 +18,7 @@ export type AnalyzeRunMeta = {
   model: string;
   latencyMs: number;
   usage: AnalyzeUsage | null;
+  promptUser: string;
 };
 
 export function getConfiguredOpenRouterVideoModel(): string {
@@ -76,11 +77,17 @@ function parseUsage(data: ChatCompletionResponse): AnalyzeUsage | null {
   return { inputTokens, outputTokens };
 }
 
-function meta(model: string, startedAt: number, usage: AnalyzeUsage | null): AnalyzeRunMeta {
+function meta(
+  model: string,
+  startedAt: number,
+  usage: AnalyzeUsage | null,
+  promptUser: string,
+): AnalyzeRunMeta {
   return {
     model,
     latencyMs: Math.max(0, Date.now() - startedAt),
     usage,
+    promptUser,
   };
 }
 
@@ -88,12 +95,14 @@ export async function analyzeVideoRecreatability(
   video: Buffer,
   mimeType: string,
   signal: AbortSignal,
+  durationSec: number | null = null,
 ): Promise<
   | { ok: true; analysis: RecreatabilityAnalysis; meta: AnalyzeRunMeta }
   | { ok: false; error: string; status?: number; meta: AnalyzeRunMeta }
 > {
   const model = getOpenRouterVideoModel();
   const startedAt = Date.now();
+  const promptUser = buildRecreatabilityUserPrompt(durationSec);
 
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
@@ -101,7 +110,7 @@ export async function analyzeVideoRecreatability(
       ok: false,
       error: "Analysis is not configured (missing OPENROUTER_API_KEY).",
       status: 503,
-      meta: meta(model, startedAt, null),
+      meta: meta(model, startedAt, null, promptUser),
     };
   }
 
@@ -124,7 +133,7 @@ export async function analyzeVideoRecreatability(
         {
           role: "user",
           content: [
-            { type: "text", text: RECREATABILITY_USER_PROMPT },
+            { type: "text", text: promptUser },
             {
               type: "video_url",
               video_url: {
@@ -141,7 +150,7 @@ export async function analyzeVideoRecreatability(
 
   const data = (await response.json()) as ChatCompletionResponse;
   const usage = parseUsage(data);
-  const runMeta = meta(model, startedAt, usage);
+  const runMeta = meta(model, startedAt, usage, promptUser);
 
   if (!response.ok) {
     const raw =

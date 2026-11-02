@@ -158,8 +158,25 @@ export function RecreatabilityCard({ analysis }: Props) {
         </ul>
       </section>
 
-      {(analysis.remakesWell.length > 0 || analysis.remakesPoorly.length > 0) ? (
+      {(analysis.remakesWell.length > 0 ||
+        analysis.remakesPoorly.length > 0 ||
+        analysis.canDrop.length > 0) ? (
         <div className="recreatability-verdict">
+          {analysis.canDrop.length > 0 ? (
+            <section
+              className="recreatability-verdict-col"
+              aria-labelledby="can-drop-heading"
+            >
+              <h2 id="can-drop-heading" className="recreatability-section-title">
+                Can drop
+              </h2>
+              <ul className="recreatability-verdict-list">
+                {analysis.canDrop.map((item, index) => (
+                  <li key={`drop-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {analysis.remakesWell.length > 0 ? (
             <section
               className="recreatability-verdict-col"

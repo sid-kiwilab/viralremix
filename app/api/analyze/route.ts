@@ -8,6 +8,7 @@ import {
   scheduleAnalyzeRunLog,
   type AnalyzeRunLogRow,
 } from "@/lib/analyze-run-log";
+import { buildRecreatabilityUserPrompt } from "@/lib/recreatability";
 import {
   analyzeVideoRecreatability,
   getConfiguredOpenRouterVideoModel,
@@ -84,6 +85,7 @@ function logAnalyzeRun(
     title: ctx.title,
     videoBytes: ctx.videoBytes,
     durationSec: ctx.durationSec,
+    promptUser: buildRecreatabilityUserPrompt(ctx.durationSec),
     model: getConfiguredOpenRouterVideoModel(),
     latencyMs: 0,
     inputTokens: null,
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
       buffer,
       mimeType,
       analyzeUpstreamSignal(request.signal),
+      ctx.durationSec,
     );
 
     if (!result.ok) {
@@ -167,6 +170,7 @@ export async function POST(request: Request) {
         status,
         model: result.meta.model,
         latencyMs: result.meta.latencyMs,
+        promptUser: result.meta.promptUser,
         inputTokens: result.meta.usage?.inputTokens ?? null,
         outputTokens: result.meta.usage?.outputTokens ?? null,
         userError,
@@ -181,6 +185,7 @@ export async function POST(request: Request) {
       status: 200,
       model: result.meta.model,
       latencyMs: result.meta.latencyMs,
+      promptUser: result.meta.promptUser,
       inputTokens: result.meta.usage?.inputTokens ?? null,
       outputTokens: result.meta.usage?.outputTokens ?? null,
       overallScore: result.analysis.overallScore,

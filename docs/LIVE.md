@@ -50,8 +50,8 @@ flowchart LR
   Home --> How["/how-it-works"]
 ```
 
-- **Home** ([`app/page.tsx`](../app/page.tsx)): Instagram Reel / TikTok URL → ingest → `<video>` preview → auto analyze (prefer `loadedmetadata` for `durationSec`; **2.5s fallback** if metadata never fires). **Reading the format…** shows during `analyzePending` (pre-metadata) and in-flight analyze. Cancel (×) clears pending or aborts the request. Recreatability card in a **720px** analysis block below the player ([`components/recreatability-card.tsx`](../components/recreatability-card.tsx)).
-- **Analyze** ([`app/api/analyze/route.ts`](../app/api/analyze/route.ts)): multipart MP4 (max **40MB**) → [`lib/openrouter.ts`](../lib/openrouter.ts) (`getConfiguredOpenRouterVideoModel`) + [`lib/recreatability.ts`](../lib/recreatability.ts). Errors via [`lib/analyze-error.ts`](../lib/analyze-error.ts). Neon [`analyze-run-log`](../lib/analyze-run-log.ts): OpenRouter outcomes plus validation failures (**400**, **413** cap, bad MIME) when form metadata is available; not **499**. Timeout 90s; route `maxDuration` 120s; **504** upstream timeout. Instagram HD Reels often **25–35MB** / ~15s — use `analyze_runs` with `status = 413` to monitor the cap.
+- **Home** ([`app/page.tsx`](../app/page.tsx)): Instagram Reel / TikTok URL → ingest → `<video>` preview → auto analyze (prefer `loadedmetadata` for `durationSec`; **2.5s fallback** if metadata never fires). **Reading the format…** shows during `analyzePending` (pre-metadata) and in-flight analyze. Cancel (×) clears pending or aborts the request. Recreatability card in a **720px** analysis block below the player ([`components/recreatability-card.tsx`](../components/recreatability-card.tsx)): **Can drop**, **Remakes well**, **Hard to remake**.
+- **Analyze** ([`app/api/analyze/route.ts`](../app/api/analyze/route.ts)): multipart MP4 (max **40MB**) → [`lib/openrouter.ts`](../lib/openrouter.ts) (`getConfiguredOpenRouterVideoModel`) + [`lib/recreatability.ts`](../lib/recreatability.ts) (**`PROMPT_VERSION` 2** — simplified remake plan, `canDrop`, segment-friendly duration). User prompt includes optional **`durationSec`** from the client; logged verbatim in `prompt_user`. Errors via [`lib/analyze-error.ts`](../lib/analyze-error.ts). Neon [`analyze-run-log`](../lib/analyze-run-log.ts): OpenRouter outcomes plus validation failures (**400**, **413** cap, bad MIME) when form metadata is available; not **499**. Timeout 90s; route `maxDuration` 120s; **504** upstream timeout. Instagram HD Reels often **25–35MB** / ~15s — use `analyze_runs` with `status = 413` to monitor the cap.
 - **Ingest** ([`app/api/ingest/route.ts`](../app/api/ingest/route.ts)): [`parseSupportedVideoUrl`](../lib/video-url.ts), call Cloud Run (or local script), return `video/mp4` + `X-Video-*` headers. Forwards `request.signal` to upstream fetch / kills local Python on client disconnect; aborted requests return **499** (not logged to Neon).
 - **Fetch worker** ([`scripts/fetch_server.py`](../scripts/fetch_server.py) + [`Dockerfile`](../Dockerfile)): same URL path rules as [`lib/video-url.ts`](../lib/video-url.ts), Bearer secret, MP4 or JSON error. Public URL (`--allow-unauthenticated`); no app-level rate limit yet — rely on secret + `max-instances`.
 - **Ingest timeouts:** Shared [`INGEST_FETCH_TIMEOUT_MS`](../lib/ingest-constants.ts) = 290s on browser + upstream fetch. Cloud Run request timeout 300s; Next [`maxDuration`](../app/api/ingest/route.ts) 300s.
@@ -113,7 +113,7 @@ LIMIT 20;
 
 ### `analyze_runs`
 
-Versioned recreatability runs for a future results/history page. Bump [`PROMPT_VERSION`](../lib/recreatability.ts) when prompts change. Rows include `prompt_system`, `prompt_user`, `model`, `result` (jsonb), `overall_score`, `band`, `status`, `source_url`, `duration_sec`, `video_bytes`, `input_tokens`, `output_tokens`, `latency_ms`, `user_error`, `raw_error`. Failed rows include validation (**413** size cap) and OpenRouter failures. Client cancel (**499**) is not logged.
+Versioned recreatability runs for a future results/history page. Bump [`PROMPT_VERSION`](../lib/recreatability.ts) when prompts change (current **2**). `prompt_user` is the per-run text from [`buildRecreatabilityUserPrompt`](../lib/recreatability.ts), not a fixed constant. Rows include `prompt_system`, `prompt_user`, `model`, `result` (jsonb, includes `canDrop` when ok), `overall_score`, `band`, `status`, `source_url`, `duration_sec`, `video_bytes`, `input_tokens`, `output_tokens`, `latency_ms`, `user_error`, `raw_error`. Failed rows include validation (**413** size cap) and OpenRouter failures. Client cancel (**499**) is not logged.
 
 ```sql
 SELECT created_at, prompt_version, model, overall_score, band,
@@ -143,11 +143,11 @@ LIMIT 20;
 | [`app/api/ingest/route.ts`](../app/api/ingest/route.ts) | Ingest API |
 | [`app/api/analyze/route.ts`](../app/api/analyze/route.ts) | Recreatability analyze API |
 | [`lib/openrouter.ts`](../lib/openrouter.ts) | OpenRouter video chat |
-| [`lib/recreatability.ts`](../lib/recreatability.ts) | Prompt + JSON parse |
+| [`lib/recreatability.ts`](../lib/recreatability.ts) | Prompt v2, `buildRecreatabilityUserPrompt`, JSON parse (`canDrop`) |
 | [`lib/analyze-constants.ts`](../lib/analyze-constants.ts) | Analyze timeout + size cap |
 | [`lib/analyze-error.ts`](../lib/analyze-error.ts) | Sanitized analyze error copy |
 | [`lib/analyze-run-log.ts`](../lib/analyze-run-log.ts) | Neon `analyze_runs` |
-| [`components/recreatability-card.tsx`](../components/recreatability-card.tsx) | Recreatability score card (stamped beat timeline or dotted beats, caption chips, dimensions) |
+| [`components/recreatability-card.tsx`](../components/recreatability-card.tsx) | Score card (format read, dimensions, **Can drop** / remakes well / hard to remake; beats timeline or dotted list) |
 | [`lib/ingest-error-log.ts`](../lib/ingest-error-log.ts) | Neon `ingest_errors` |
 | [`lib/ingest-constants.ts`](../lib/ingest-constants.ts) | Shared ingest timeout (290s) |
 | [`lib/video-url.ts`](../lib/video-url.ts) | URL allowlist / canonical URLs |

@@ -21,11 +21,12 @@ export type RecreatabilityAnalysis = {
   speechSummary: string;
   remakesWell: string[];
   remakesPoorly: string[];
+  canDrop: string[];
   summary: string;
 };
 
-/** Bump when RECREATABILITY_SYSTEM_PROMPT or RECREATABILITY_USER_PROMPT changes. */
-export const PROMPT_VERSION = 1;
+/** Bump when RECREATABILITY_SYSTEM_PROMPT or buildRecreatabilityUserPrompt changes. */
+export const PROMPT_VERSION = 2;
 
 const DIMENSION_KEYS: (keyof RecreatabilityDimensions)[] = [
   "durationFit",
@@ -38,19 +39,33 @@ const DIMENSION_KEYS: (keyof RecreatabilityDimensions)[] = [
   "audioSync",
 ];
 
-export const RECREATABILITY_SYSTEM_PROMPT = `You analyze short-form social videos (Instagram Reels, TikTok) for how remakeable they are with tools available in 2026.
+export const RECREATABILITY_SYSTEM_PROMPT = `You analyze short-form social videos (Instagram Reels, TikTok) for how remakeable their FORMAT is with tools available in 2026.
+
+Score a practical AI remake plan — not a pixel-perfect clone of the original.
 
 Be honest and conservative — do not inflate scores.
 
+Observation (hook, beats, speechSummary, onScreenText):
+- Describe only what is visibly and audibly in the clip. Do not invent gestures, props, or sync.
+- A character highlight or color change on text/graphics is NOT pointing unless you clearly see a hand or finger touch that target.
+- If the subject is mostly still and text or graphics change, say that; do not assume pointing, dancing, or complex motion.
+
+Remake mindset:
+- Assume we can drop anything current AI is bad at IF the same format effect still works (e.g. voiceover + timed text highlights instead of lip-sync; generic presenter instead of a specific face; no pointing if highlights alone carry the lesson).
+- List those simplifications in canDrop.
+- remakesWell: what the simplified remake leans on.
+- remakesPoorly: only obstacles that stay REQUIRED for the format after dropping optional complexity — not "original had speech" if we can use VO without on-camera lip-sync.
+
 2026 recreation reality:
-- Still image generation can look hyper-real; a frame that barely moves can often be faked with images + light motion.
-- Video generation works best for 3–8 second clips, minimal subject motion, simple camera, and when lip-sync does not need to match visible speech.
-- Fast body motion (dance, sports, fights), handheld/whip pans, crowds, multi-person choreography, and on-camera talking with visible lips are hard or unreliable.
-- On-screen text, captions, and beat-synced cuts are relatively easy to recreate in post.
-- Specific recognizable celebrities or unique faces are harder than generic subjects.
+- Still image generation can look hyper-real; minimal subject motion can often be images + light motion.
+- Video generation works best per segment in roughly 4–8 second chunks; longer clips are usually several segments stitched in edit unless the hook is one unbroken continuous take (single-shot reveal, unbroken dance, no natural cut points).
+- durationFit: high when the format repeats or can be cut into 4–8s segments; low only when the whole hook must stay one continuous take.
+- Fast body motion (dance, sports, fights), handheld/whip pans, crowds, and multi-person choreography remain hard.
+- On-screen text, captions, and beat-synced cuts are relatively easy in post.
+- Score speechLipSync, identity, and subjectMotion for the REMAKE PLAN (after canDrop), not for matching the original performer.
 
 Score each dimension 0–100 where HIGHER means EASIER to recreate with current AI video/image tools.
-Compute overallScore as a weighted judgment (not a naive average); cap overall below 40 for clips dominated by dance, sports, or lip-synced talking head longer than ~10s.
+Compute overallScore as a weighted judgment (not a naive average) for the simplified remake plan.
 
 Return ONLY valid JSON matching this exact shape (no markdown, no commentary):
 {
@@ -72,13 +87,23 @@ Return ONLY valid JSON matching this exact shape (no markdown, no commentary):
   "speechSummary": string,
   "remakesWell": string[],
   "remakesPoorly": string[],
+  "canDrop": string[],
   "summary": string
 }
 
 Band rules: high = overallScore >= 70, medium = 40–69, low = below 40.`;
 
+/** Base user prompt when duration is unknown (logs / fallback). */
 export const RECREATABILITY_USER_PROMPT =
-  "Watch this entire clip (visual + audio). Describe the format and score recreatability for AI remake as specified.";
+  "Watch this entire clip (visual + audio). Describe the format accurately and score recreatability for a simplified AI remake as specified.";
+
+export function buildRecreatabilityUserPrompt(durationSec: number | null): string {
+  if (durationSec !== null && Number.isFinite(durationSec) && durationSec > 0) {
+    const rounded = Math.round(durationSec * 10) / 10;
+    return `${RECREATABILITY_USER_PROMPT} The browser reports this clip is about ${rounded} seconds long — use that for durationFit (segment/stitch plan), not as a reason to penalize length by itself.`;
+  }
+  return RECREATABILITY_USER_PROMPT;
+}
 
 function clampScore(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -170,6 +195,7 @@ export function parseRecreatabilityAnalysis(rawText: string): RecreatabilityAnal
     speechSummary,
     remakesWell: parseStringArray(obj.remakesWell),
     remakesPoorly: parseStringArray(obj.remakesPoorly),
+    canDrop: parseStringArray(obj.canDrop),
     summary,
   };
 }

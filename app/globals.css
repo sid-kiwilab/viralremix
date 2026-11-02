@@ -747,7 +747,13 @@ button {
 @media (min-width: 640px) {
   .recreatability-verdict {
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 28px;
+  }
+
+  .recreatability-verdict-col {
+    flex: 1 1 11rem;
+    min-width: min(100%, 11rem);
   }
 
   .recreatability-verdict-col + .recreatability-verdict-col {

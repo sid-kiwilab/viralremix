@@ -2,7 +2,7 @@
 
 **Take a video URL. Recreate the format.**
 
-Sister of [Viral Radar](https://github.com/sid-kiwilab/viralradar): Radar finds outlier formats in a niche; Remix remakes one video. **Fetch** pulls an Instagram Reel or TikTok via Cloud Run and previews it in the browser (session blob URL only — nothing kept in the repo). After fetch, **Analyze** scores recreatability with OpenRouter + Gemini (native video).
+Sister of [Viral Radar](https://github.com/sid-kiwilab/viralradar): Radar finds outlier formats in a niche; Remix remakes one video. **Fetch** pulls an Instagram Reel or TikTok via Cloud Run and previews it in the browser (session blob URL only — nothing kept in the repo). After fetch, **Analyze** scores recreatability for a simplified AI remake (OpenRouter + Gemini native video; prompt version logged in Neon).
 
 ## Routes
 
@@ -68,7 +68,7 @@ lib/
   analyze-error.ts      # Sanitized analyze errors
   analyze-run-log.ts    # Neon analyze_runs
   openrouter.ts         # OpenRouter video client
-  recreatability.ts     # Prompt + JSON schema
+  recreatability.ts     # Prompt v2 + buildRecreatabilityUserPrompt + JSON schema
 scripts/
   fetch_video.py        # yt-dlp + curl_cffi download
   fetch_server.py       # Cloud Run HTTP wrapper

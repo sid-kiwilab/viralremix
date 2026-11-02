@@ -6,6 +6,17 @@ Newest entries at the top.
 
 ---
 
+## 2026-11-02: Recreatability prompt v2
+
+- **Shipped:** [`PROMPT_VERSION`](../lib/recreatability.ts) **2** — scores a **simplified remake plan** (accurate observation, droppable complexity, 4–8s segment/stitch duration), not a 1:1 clone. New **`canDrop`** array in JSON + **Can drop** column on the card. User prompt via [`buildRecreatabilityUserPrompt`](../lib/recreatability.ts) (browser **`durationSec`** when known); Neon `analyze_runs` logs composed `prompt_user`.
+- **Fix:** Single source for base user text (`RECREATABILITY_USER_PROMPT`); verdict columns **wrap** on narrow widths (`app/globals.css`).
+- **Key files:** `lib/recreatability.ts`, `lib/openrouter.ts`, `lib/analyze-run-log.ts`, `app/api/analyze/route.ts`, `components/recreatability-card.tsx`, `app/globals.css`, `app/how-it-works/page.tsx`
+- **Gaps:** v2 scores are not comparable to v1 rows. Remix (step 3) not started.
+- **Owner:** Re-analyze a clip (e.g. Korean letter grid); confirm beats do not invent pointing, **Can drop** lists lip-sync/pointing when optional, duration not treated as hard by length alone; check verdict layout on phone.
+- **Harness:** PLAN → build → REVIEW → FIX → SYNC (this entry).
+
+---
+
 ## 2026-11-02: House avatar Luca (Avatars page)
 
 - **Shipped:** **Luca** in [`public/avatars/luca/`](../public/avatars/luca/) (full JPGs + [`profile-display.webp`](../public/avatars/luca/profile-display.webp) for UI). Catalog [`lib/characters.ts`](../lib/characters.ts): `role`, `consentLine`, `statusLine`, `generation` (profile, face, turnaround). [`/avatars`](../app/avatars/page.tsx): glass card, rounded portrait, mobile-friendly layout; header **Avatars** link. [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) rebuilds display WebP from `profile.jpg`. UI rule: [`.cursor/rules/no-ui-dividers.mdc`](../.cursor/rules/no-ui-dividers.mdc) (no section divider lines; whole-card outlines OK).

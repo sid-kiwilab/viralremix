@@ -3,7 +3,6 @@ import { neon } from "@neondatabase/serverless";
 import {
   PROMPT_VERSION,
   RECREATABILITY_SYSTEM_PROMPT,
-  RECREATABILITY_USER_PROMPT,
   type RecreatabilityAnalysis,
   type RecreatabilityBand,
 } from "@/lib/recreatability";
@@ -15,6 +14,7 @@ export type AnalyzeRunLogRow = {
   title: string | null;
   videoBytes: number;
   durationSec: number | null;
+  promptUser: string;
   model: string;
   latencyMs: number;
   inputTokens: number | null;
@@ -99,7 +99,7 @@ async function writeAnalyzeRun(row: AnalyzeRunLogRow) {
       VALUES (
         ${PROMPT_VERSION},
         ${RECREATABILITY_SYSTEM_PROMPT},
-        ${RECREATABILITY_USER_PROMPT},
+        ${row.promptUser},
         ${row.model},
         ${row.ok},
         ${row.overallScore},
