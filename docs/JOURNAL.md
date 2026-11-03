@@ -6,12 +6,60 @@ Newest entries at the top.
 
 ---
 
+## 2026-11-03: Recreate pipeline (TikTok segment → Luca + Remotion)
+
+- **Shipped:** [`scripts/recreate-segment.ts`](../scripts/recreate-segment.ts) — fetch/trim segment, vision plan, **Groq/OpenAI Whisper or OpenRouter ASR**, EvoLink mini 720p (`lipsync-segments` / stable-loop / Remotion overlays). [`scripts/evolink-from-reference-segment.ts`](../scripts/evolink-from-reference-segment.ts) — **one** lip-sync clip from `first-{n}s.mp4` ASR (no Remotion). [`lib/transcribe-whisper-api.ts`](../lib/transcribe-whisper-api.ts), [`lib/lipsync-timeline.ts`](../lib/lipsync-timeline.ts), [`lib/resolve-evolink-image-urls.ts`](../lib/resolve-evolink-image-urls.ts). Remotion: Turkish flag badge, separate embedded audio tracks, ffmpeg-safe clip prep. Output under `out/recreate/` (gitignored); Luca JPGs in `public/avatars/luca/` for GitHub raw / `REMIX_LUCA_REF_BASE`.
+- **Fix (harness):** Dropped wasted base-loop EvoLink job on lipsync regen; removed broken EvoLink upload helper; deprecated stitch-only [`export-lipsync-only.ts`](../scripts/export-lipsync-only.ts) (`--legacy-stitch`).
+- **Key files:** `scripts/recreate-segment.ts`, `scripts/evolink-from-reference-segment.ts`, `lib/segment-transcribe.ts`, `lib/remix-render.ts`, `remotion/RemixComposition.tsx`, `docs/RECREATE-STRATEGY.md`, `docs/PLAYBOOK.md`
+- **Gaps:** Push Luca JPGs to `main` (raw 404 until then); Rosetta 16s remake still iterative (overlay timing, wardrobe across phrase clips); `public/recreate-plates/` gitignored — set plate needs same public origin as Luca refs.
+- **Harness:** REVIEW → FIX → SYNC (this entry).
+
+---
+
+## 2026-11-03: Playbook + no burned-in AI graphics
+
+- **Preference (owner):** EvoLink clips = clean Luca + set + motion/audio only; **all** text/pills/captions in Remotion.
+- **Shipped:** [`docs/PLAYBOOK.md`](PLAYBOOK.md) (learnings + prefs), [`lib/ai-video-prompt.ts`](../lib/ai-video-prompt.ts), enforce on every EvoLink submit, [`.cursor/rules/remix-playbook.mdc`](../.cursor/rules/remix-playbook.mdc), prompt updates in recreate / lipsync / remix-plan / segment-analyze.
+- **Harness:** owner request → SYNC.
+
+---
+
+## 2026-11-02: Home remix hardening (REVIEW → FIX)
+
+- **Shipped:** Failed jobs and poll errors sanitized via [`lib/remix-error.ts`](../lib/remix-error.ts) (`userFacingRemixError` on `GET /api/remix/[jobId]` and home poll). Spawn failure marks job **`failed`** ([`spawnRemixRenderJobOrFail`](../lib/remix-spawn.ts)) instead of leaving **`queued`**; render route awaits spawn before returning `jobId`.
+- **Key files:** `lib/remix-spawn.ts`, `lib/remix-error.ts`, `app/api/remix/render/route.ts`, `app/api/remix/[jobId]/route.ts`, `app/page.tsx`
+- **Gaps:** Cancel still stops polling only; plan abort vs in-flight OpenRouter unchanged.
+- **Harness:** REVIEW → FIX → SYNC (this entry).
+
+---
+
+## 2026-11-02: Remake plan on home (review, then generate)
+
+- **Shipped:** Score **≥ 60** → **Remake plan** / **Make video** on [`app/page.tsx`](../app/page.tsx). [`POST /api/remix/plan`](../app/api/remix/plan/route.ts), [`POST /api/remix/render`](../app/api/remix/render/route.ts), job poll + MP4 stream. Shared [`lib/remix-render.ts`](../lib/remix-render.ts); detached [`scripts/remix-render.ts`](../scripts/remix-render.ts). [`components/remix-plan-card.tsx`](../components/remix-plan-card.tsx).
+- **Key files:** `lib/remix-job.ts`, `lib/remix-spawn.ts`, `lib/remix-validate.ts`, `app/api/remix/*`, `app/globals.css`, docs
+- **Gaps:** Render jobs are local temp files only (not Vercel-safe); cancel stops polling, not EvoLink; simplified 15s cap unchanged.
+- **Owner:** Fetch TikTok → 85 card → Remake plan → Make video → play remake player.
+- **Harness:** PLAN → build → REVIEW → FIX → SYNC.
+
+---
+
+## 2026-11-02: Remix CLI (EvoLink + Remotion)
+
+- **Shipped:** [`npm run remix`](../package.json) → [`scripts/remix.ts`](../scripts/remix.ts): Neon `analyze_runs` (**prompt_version 2**, score **≥ 60**) or JSON (**analysis object** or Neon row with **`result`**) → OpenRouter edit plan ([`lib/remix-plan.ts`](../lib/remix-plan.ts), honors **`canDrop`**) → EvoLink Seedance 2.5 reference-to-video (Luca `@image1`–`@image3`; **`REMIX_LUCA_REF_BASE`** or GitHub raw on `main`) + Qwen TTS VO → Remotion 1080×1920 hard cuts, positioned text overlays, VO → **`out/remix.mp4`**. Spec/assets under `out/` (gitignored).
+- **Fix:** Absolute overlay placement; timeline `durationSec` includes text through 15s cap; optional Luca ref base env; removed unused `@remotion/cli`.
+- **Key files:** `lib/remix-spec.ts`, `lib/evolink.ts`, `lib/remotion-input.ts`, `lib/remix-analyze-load.ts`, `lib/openrouter-chat.ts`, `lib/load-env.ts`, `lib/characters.ts`, `remotion/*`, `package.json`, `.env.example`, docs, `app/how-it-works/page.tsx`
+- **Gaps:** Default Luca refs need JPGs on `origin/main` (or set `REMIX_LUCA_REF_BASE`); no remix job logging in Neon; clip length vs EvoLink output is best-effort.
+- **Owner:** After a 60+ v2 analyze, `npm run remix` with keys in `.env`; open `out/remix.mp4`.
+- **Harness:** PLAN → build → REVIEW → FIX → SYNC (this entry).
+
+---
+
 ## 2026-11-02: Recreatability prompt v2
 
 - **Shipped:** [`PROMPT_VERSION`](../lib/recreatability.ts) **2** — scores a **simplified remake plan** (accurate observation, droppable complexity, 4–8s segment/stitch duration), not a 1:1 clone. New **`canDrop`** array in JSON + **Can drop** column on the card. User prompt via [`buildRecreatabilityUserPrompt`](../lib/recreatability.ts) (browser **`durationSec`** when known); Neon `analyze_runs` logs composed `prompt_user`.
 - **Fix:** Single source for base user text (`RECREATABILITY_USER_PROMPT`); verdict columns **wrap** on narrow widths (`app/globals.css`).
 - **Key files:** `lib/recreatability.ts`, `lib/openrouter.ts`, `lib/analyze-run-log.ts`, `app/api/analyze/route.ts`, `components/recreatability-card.tsx`, `app/globals.css`, `app/how-it-works/page.tsx`
-- **Gaps:** v2 scores are not comparable to v1 rows. Remix (step 3) not started.
+- **Gaps:** v2 scores are not comparable to v1 rows.
 - **Owner:** Re-analyze a clip (e.g. Korean letter grid); confirm beats do not invent pointing, **Can drop** lists lip-sync/pointing when optional, duration not treated as hard by length alone; check verdict layout on phone.
 - **Harness:** PLAN → build → REVIEW → FIX → SYNC (this entry).
 

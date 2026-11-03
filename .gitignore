@@ -15,12 +15,15 @@
 
 # next.js
 /.next/
-/out/
-
-# production
 /build
 
-# misc
+# All generated video output (recreate, remix, lipsync-lab, rosettastone tests)
+/out/
+
+# Per-video set plates copied here for EvoLink @image4 — regenerate from recreate scripts
+/public/recreate-plates/
+
+# production / misc
 .DS_Store
 *.pem
 
@@ -40,6 +43,17 @@ yarn-error.log*
 # vercel
 .vercel
 
-# typescript
+# typescript / remotion
 *.tsbuildinfo
 next-env.d.ts
+.remotion/
+
+# ASR / ffmpeg temp next to source videos (under out/ too, but safe if paths move)
+.transcribe-*.mp3
+
+# Stray media at repo root (never commit renders)
+/*.mp4
+/*.mov
+/*.webm
+/*.mp3
+/*.aac

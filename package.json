@@ -6,13 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "remix": "tsx scripts/remix.ts",
+    "lipsync-lab": "tsx scripts/lipsync-lab.ts",
+    "recreate-segment": "tsx scripts/recreate-segment.ts",
+    "evolink-from-reference": "tsx scripts/evolink-from-reference-segment.ts",
+    "transcribe-local": "tsx scripts/transcribe-local-file.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "@remotion/bundler": "^4.0.286",
+    "@remotion/google-fonts": "^4.0.286",
+    "@remotion/renderer": "^4.0.286",
     "next": "16.4.3",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "remotion": "^4.0.286"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -22,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.4",
     "typescript": "^5"
   }
 }

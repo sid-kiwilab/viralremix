@@ -12,10 +12,10 @@ Local dev: [README.md](../README.md). Session history: [JOURNAL.md](JOURNAL.md).
 | Product | **Viral Remix**: take a video URL, recreate the format |
 | Sister | Viral Radar (`c:\flutter_apps\viralradar`) — find outliers; this remakes one |
 | Domain | unset |
-| Stack | Next.js 16, React 19, Tailwind 4 |
+| Stack | Next.js 16, React 19, Tailwind 4; Remotion 4 + EvoLink (Remix CLI only) |
 | App root | `app/` (no `src/`) |
 | Dev server | `npm run dev` or [`start.bat`](../start.bat) → **owner** verifies in browser. Agent never opens or fetches localhost. |
-| Routes | `/`, `/how-it-works`, `/avatars`, `POST /api/ingest`, `POST /api/analyze` |
+| Routes | `/`, `/how-it-works`, `/avatars`, `POST /api/ingest`, `POST /api/analyze`, remix APIs (`/api/remix/plan`, `/api/remix/render`, `/api/remix/[jobId]`) |
 | Backend | Cloud Run `viralremix-fetch` (Docker + yt-dlp + curl_cffi + ffmpeg). Local Python only if `CLOUD_RUN_URL` is unset or whitespace. |
 | Cloud Run revision | `viralremix-fetch-00003-4xt` (redeploy after `fetch_server.py` / Dockerfile changes) |
 | GCP project | `viral-remix-app` (Firebase + Cloud Run) |
@@ -55,9 +55,11 @@ flowchart LR
 - **Ingest** ([`app/api/ingest/route.ts`](../app/api/ingest/route.ts)): [`parseSupportedVideoUrl`](../lib/video-url.ts), call Cloud Run (or local script), return `video/mp4` + `X-Video-*` headers. Forwards `request.signal` to upstream fetch / kills local Python on client disconnect; aborted requests return **499** (not logged to Neon).
 - **Fetch worker** ([`scripts/fetch_server.py`](../scripts/fetch_server.py) + [`Dockerfile`](../Dockerfile)): same URL path rules as [`lib/video-url.ts`](../lib/video-url.ts), Bearer secret, MP4 or JSON error. Public URL (`--allow-unauthenticated`); no app-level rate limit yet — rely on secret + `max-instances`.
 - **Ingest timeouts:** Shared [`INGEST_FETCH_TIMEOUT_MS`](../lib/ingest-constants.ts) = 290s on browser + upstream fetch. Cloud Run request timeout 300s; Next [`maxDuration`](../app/api/ingest/route.ts) 300s.
-- **How it works** ([`app/how-it-works/page.tsx`](../app/how-it-works/page.tsx)): steps 1–2 live; step 3 Remix stub.
-- **Avatars** ([`app/avatars/page.tsx`](../app/avatars/page.tsx)): **Luca** from [`lib/characters.ts`](../lib/characters.ts) — UI uses `profile-display.webp`; full assets under [`public/avatars/luca/`](../public/avatars/luca/) for future Remix (`generation.profile`, face, turnaround). Rebuild display file: [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) (Pillow). Not wired to Remix.
-- **Gitignore**: `.env*` (except example), `node_modules/`, `.next/`, `.vercel/`, legacy `/.data/`.
+- **How it works** ([`app/how-it-works/page.tsx`](../app/how-it-works/page.tsx)): Fetch, analyze, and Remix CLI overview.
+- **Remix (home)** ([`app/page.tsx`](../app/page.tsx)): after analyze **≥ 60**, **Remake plan** (`POST /api/remix/plan`) shows [`RemixPlanCard`](../components/remix-plan-card.tsx); **Make video** spawns a detached worker ([`scripts/remix-render.ts`](../scripts/remix-render.ts)) via [`POST /api/remix/render`](../app/api/remix/render/route.ts). Job files under `%TEMP%/viralremix/remix-{uuid}/`; poll `GET /api/remix/[jobId]` (failed status returns sanitized errors via [`lib/remix-error.ts`](../lib/remix-error.ts)); play `GET /api/remix/[jobId]/video`. If spawn fails, job is marked **`failed`** ([`lib/remix-spawn.ts`](../lib/remix-spawn.ts)). Local dev only (spawn + Remotion).
+- **Remix CLI** ([`scripts/remix.ts`](../scripts/remix.ts)): same EvoLink + Remotion pipeline headless → `out/remix.mp4` (Neon or JSON input).
+- **Avatars** ([`app/avatars/page.tsx`](../app/avatars/page.tsx)): **Luca** from [`lib/characters.ts`](../lib/characters.ts) — UI uses `profile-display.webp`; EvoLink uses public raw JPGs (`getLucaGenerationRefUrls`). Rebuild display file: [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) (Pillow).
+- **Gitignore**: `.env*` (except example), `node_modules/`, `.next/`, `.vercel/`, `/out/`, legacy `/.data/`.
 
 ---
 
@@ -71,7 +73,10 @@ flowchart LR
 | `PYTHON_PATH` | No | Local fallback only | Default `python` (Windows) or `python3` |
 | `OPENROUTER_API_KEY` | For analyze | Next analyze route | Trimmed; server-only; Gemini via OpenRouter |
 | `OPENROUTER_VIDEO_MODEL` | No | Next analyze route | Default **`google/gemini-2.5-flash`** (stable). Preview models (e.g. 3-flash) via env only when ready |
-| `EVOLINK_API_KEY` | No | — | Documented for future Remix (generation); not used by analyze |
+| `EVOLINK_API_KEY` | For Remix | CLI + home render worker | Seedance 2.5 + Qwen TTS; not used by analyze |
+| `EVOLINK_TTS_VOICE` | No | Remix | Optional Qwen voice id |
+| `REMIX_LUCA_REF_BASE` | No | Remix | Public URL base for Luca JPGs (EvoLink); default GitHub raw on `main` |
+| `OPENROUTER_PLAN_MODEL` | No | Remix plan (API + CLI) | Text plan step; defaults like analyze |
 
 Placeholders: [`.env.example`](../.env.example). Never commit `.env`.
 
@@ -161,6 +166,17 @@ LIMIT 20;
 | [`lib/characters.ts`](../lib/characters.ts) | Avatar catalog (`CHARACTERS`: role, consent, status, `profileSrc`, `generation.*`) |
 | [`public/avatars/luca/`](../public/avatars/luca/) | Luca assets: `profile-display.webp` (UI), `profile.jpg` + `face.jpg` + `turnaround.jpg` (generation) |
 | [`scripts/optimize_avatar_display.py`](../scripts/optimize_avatar_display.py) | Regenerate `profile-display.webp` after `profile.jpg` changes |
+| [`scripts/remix.ts`](../scripts/remix.ts) | Remix CLI entry |
+| [`lib/remix-plan.ts`](../lib/remix-plan.ts), [`lib/remix-spec.ts`](../lib/remix-spec.ts) | Edit plan + schema |
+| [`lib/remix-render.ts`](../lib/remix-render.ts), [`lib/remix-job.ts`](../lib/remix-job.ts), [`lib/remix-spawn.ts`](../lib/remix-spawn.ts) | Shared render pipeline + temp job dirs + spawn |
+| [`lib/remix-error.ts`](../lib/remix-error.ts) | User-facing remix error strings |
+| [`lib/evolink.ts`](../lib/evolink.ts) | EvoLink generation client |
+| [`scripts/recreate-segment.ts`](../scripts/recreate-segment.ts) | TikTok segment recreate (EvoLink + Remotion) |
+| [`scripts/evolink-from-reference-segment.ts`](../scripts/evolink-from-reference-segment.ts) | Single EvoLink clip from `first-{n}s` ASR |
+| [`lib/segment-transcribe.ts`](../lib/segment-transcribe.ts), [`lib/transcribe-whisper-api.ts`](../lib/transcribe-whisper-api.ts) | ASR (Groq/OpenAI/OpenRouter) |
+| [`lib/resolve-evolink-image-urls.ts`](../lib/resolve-evolink-image-urls.ts) | Public Luca + set-plate URLs for EvoLink |
+| [`remotion/`](../remotion/) | Remotion `Remix` composition |
+| [`docs/RECREATE-STRATEGY.md`](../docs/RECREATE-STRATEGY.md), [`docs/PLAYBOOK.md`](../docs/PLAYBOOK.md) | Recreate prefs + pipeline |
 | [`start.bat`](../start.bat) | `npm run dev` |
 
 ---
@@ -172,7 +188,12 @@ cd c:\flutter_apps\viralremix
 npm run dev
 npm run build
 npm run lint
+npm run remix
 ```
+
+Remix CLI: needs `OPENROUTER_API_KEY`, `EVOLINK_API_KEY`, eligible analyze row or JSON file; optional `REMIX_LUCA_REF_BASE`, `EVOLINK_TTS_VOICE`, `OPENROUTER_PLAN_MODEL`. First Remotion render downloads Chromium. Output: `out/remix.mp4`.
+
+**Recreate / EvoLink:** `public/avatars/luca/*.jpg` must be reachable at `getLucaGenerationRefUrls()` (push to GitHub `main` or set `REMIX_LUCA_REF_BASE`). Set plates land in `public/recreate-plates/` (gitignored) and are served from the same public origin as Luca refs. ASR: `GROQ_API_KEY` or `OPENAI_API_KEY` preferred (`TRANSCRIBE_PROVIDER`); else OpenRouter. One-shot 8s lip-sync test: `npx tsx scripts/evolink-from-reference-segment.ts --url "<tiktok>" --sec 8` → `out/recreate/<id>/evolink-first-8s.mp4`. Full segment: `npm run recreate-segment`.
 
 Owner verifies: **Fetch** a public Reel or TikTok → recreatability card; cancel mid-analyze and **Read format again**; `/how-it-works`, `/avatars` (desktop + phone), tab icon. Restart dev server after adding `OPENROUTER_API_KEY`. Confirm rows in Neon `analyze_runs` after a successful analyze. Agents do not fetch localhost.
 

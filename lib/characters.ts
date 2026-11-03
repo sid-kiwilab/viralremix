@@ -14,6 +14,24 @@ export type Character = {
   statusLine: string;
 };
 
+const DEFAULT_LUCA_GENERATION_REF_BASE =
+  "https://raw.githubusercontent.com/sid-kiwilab/viralremix/main/public/avatars/luca";
+
+/** Public URLs for EvoLink reference-to-video (override with REMIX_LUCA_REF_BASE). */
+export function getLucaGenerationRefBase(): string {
+  const fromEnv = (process.env.REMIX_LUCA_REF_BASE ?? "").trim();
+  return (fromEnv || DEFAULT_LUCA_GENERATION_REF_BASE).replace(/\/$/, "");
+}
+
+export function getLucaGenerationRefUrls(): string[] {
+  const base = getLucaGenerationRefBase();
+  return [
+    `${base}/profile.jpg`,
+    `${base}/face.jpg`,
+    `${base}/turnaround.jpg`,
+  ];
+}
+
 export const CHARACTERS = [
   {
     id: "luca",
@@ -27,6 +45,6 @@ export const CHARACTERS = [
     },
     consentLine:
       "Luca kindly agreed to be the model for all our videos.",
-    statusLine: "Remix not connected yet.",
+    statusLine: "Remix CLI uses his reference JPGs via EvoLink.",
   },
 ] as const satisfies readonly Character[];

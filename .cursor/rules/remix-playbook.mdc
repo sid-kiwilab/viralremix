@@ -1,0 +1,22 @@
+---
+description: Remix / EvoLink / Remotion preferences and learnings
+globs:
+  - lib/evolink.ts
+  - lib/remix-*.ts
+  - lib/segment-analyze.ts
+  - lib/ai-video-prompt.ts
+  - scripts/recreate-segment.ts
+  - scripts/lipsync-lab.ts
+  - scripts/remix*.ts
+  - remotion/**
+---
+
+# Remix playbook
+
+Before changing remix, recreate, or EvoLink behavior, read [docs/PLAYBOOK.md](../../docs/PLAYBOOK.md).
+
+**Hard rule:** AI reference-to-video clips must **never** include on-screen text, captions, logos, or UI. Put all typography and timed graphics in **Remotion** (`textOverlays`). Use [`lib/ai-video-prompt.ts`](../../lib/ai-video-prompt.ts) and ensure submits go through `ensureNoBurnedGraphicsInPrompt` in [`lib/evolink.ts`](../../lib/evolink.ts).
+
+**Cost defaults:** 720p, mini model, `generate_audio` for speech unless owner asks for premium 2.5 / 1080p.
+
+**Luca refs:** must be public HTTPS (`REMIX_LUCA_REF_BASE` or JPGs on GitHub `main`).

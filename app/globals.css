@@ -455,6 +455,111 @@ button {
   max-width: 720px;
   margin-top: 28px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.remix-gate-msg {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.62);
+  text-align: left;
+}
+
+.remix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.remix-plan-card {
+  width: 100%;
+  padding: 24px 22px 26px;
+  border-radius: 12px;
+  border: 1px solid rgba(198, 198, 198, 0.2);
+  background: rgba(8, 8, 8, 0.58);
+  backdrop-filter: blur(8px);
+  text-align: left;
+}
+
+.remix-plan-header {
+  margin-bottom: 18px;
+}
+
+.remix-plan-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.remix-plan-title {
+  margin: 0;
+  font-family: var(--font-instrument-serif), "Instrument Serif", Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.remix-plan-meta {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.remix-plan-section {
+  margin-top: 18px;
+}
+
+.remix-plan-section-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.remix-plan-clips,
+.remix-plan-overlays {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.remix-plan-clip-meta,
+.remix-plan-overlay-time {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.remix-plan-clip-prompt,
+.remix-plan-overlay-text,
+.remix-plan-vo-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.remix-result-label {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: left;
+  width: 100%;
+  max-width: var(--meta-max);
 }
 
 .recreatability-card {

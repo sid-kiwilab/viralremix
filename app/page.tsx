@@ -2,10 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RecreatabilityCard } from "@/components/recreatability-card";
+import { RemixPlanCard } from "@/components/remix-plan-card";
 import { SiteShell } from "@/components/site-shell";
 import { ANALYZE_FETCH_TIMEOUT_MS } from "@/lib/analyze-constants";
 import { INGEST_FETCH_TIMEOUT_MS } from "@/lib/ingest-constants";
+import {
+  REMIX_PLAN_FETCH_TIMEOUT_MS,
+  REMIX_RENDER_CLIENT_TIMEOUT_MS,
+  REMIX_RENDER_POLL_MS,
+} from "@/lib/remix-constants";
 import type { RecreatabilityAnalysis } from "@/lib/recreatability";
+import type { RemixJobStatus } from "@/lib/remix-constants";
+import { userFacingRemixError } from "@/lib/remix-error";
+import { REMIX_MIN_SCORE, type RemixSpec } from "@/lib/remix-spec";
 
 type PreviewState = {
   platform: "instagram" | "tiktok";
@@ -41,6 +50,31 @@ export default function Home() {
   const analyzeFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const [remixSpec, setRemixSpec] = useState<RemixSpec | null>(null);
+  const [remixPlanLoading, setRemixPlanLoading] = useState(false);
+  const [remixPlanError, setRemixPlanError] = useState<string | null>(null);
+  const [remixJobId, setRemixJobId] = useState<string | null>(null);
+  const [remixJobStatus, setRemixJobStatus] = useState<RemixJobStatus | null>(
+    null,
+  );
+  const [remixRenderError, setRemixRenderError] = useState<string | null>(null);
+  const [remixVideoUrl, setRemixVideoUrl] = useState<string | null>(null);
+  const remixPlanAbortRef = useRef<AbortController | null>(null);
+  const remixPollAbortRef = useRef<AbortController | null>(null);
+
+  function clearRemixState() {
+    remixPlanAbortRef.current?.abort();
+    remixPlanAbortRef.current = null;
+    remixPollAbortRef.current?.abort();
+    remixPollAbortRef.current = null;
+    setRemixSpec(null);
+    setRemixPlanLoading(false);
+    setRemixPlanError(null);
+    setRemixJobId(null);
+    setRemixJobStatus(null);
+    setRemixRenderError(null);
+    setRemixVideoUrl(null);
+  }
 
   function clearAnalyzeFallbackTimer() {
     if (analyzeFallbackTimerRef.current !== null) {
@@ -66,6 +100,7 @@ export default function Home() {
     setAnalysis(null);
     setAnalyzeError(null);
     setAnalyzeLoading(false);
+    clearRemixState();
   }
 
   function cancelAnalyze() {
@@ -91,6 +126,7 @@ export default function Home() {
     setAnalyzeLoading(true);
     setAnalyzeError(null);
     setAnalysis(null);
+    clearRemixState();
 
     const isActive = () =>
       analyzeAbortRef.current === controller && !controller.signal.aborted;
@@ -159,6 +195,8 @@ export default function Home() {
       clearAnalyzeFallbackTimer();
       abortRef.current?.abort();
       analyzeAbortRef.current?.abort();
+      remixPlanAbortRef.current?.abort();
+      remixPollAbortRef.current?.abort();
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
       }
@@ -285,6 +323,191 @@ export default function Home() {
     void runAnalyze(pending);
   }
 
+  function cancelRemixPlan() {
+    if (!remixPlanLoading) return;
+    remixPlanAbortRef.current?.abort();
+    remixPlanAbortRef.current = null;
+    setRemixPlanLoading(false);
+    setRemixPlanError(null);
+  }
+
+  function cancelRemixPoll() {
+    remixPollAbortRef.current?.abort();
+    remixPollAbortRef.current = null;
+    setRemixJobId(null);
+    setRemixJobStatus(null);
+    setRemixRenderError(null);
+  }
+
+  const runRemixPlan = useCallback(async () => {
+    if (!analysis || analysis.overallScore < REMIX_MIN_SCORE) return;
+
+    remixPlanAbortRef.current?.abort();
+    const controller = new AbortController();
+    remixPlanAbortRef.current = controller;
+
+    setRemixPlanLoading(true);
+    setRemixPlanError(null);
+    setRemixSpec(null);
+    setRemixJobId(null);
+    setRemixJobStatus(null);
+    setRemixRenderError(null);
+    setRemixVideoUrl(null);
+
+    const isActive = () =>
+      remixPlanAbortRef.current === controller && !controller.signal.aborted;
+
+    const timeoutSignal = AbortSignal.timeout(REMIX_PLAN_FETCH_TIMEOUT_MS);
+    const fetchSignal = AbortSignal.any([controller.signal, timeoutSignal]);
+
+    try {
+      const response = await fetch("/api/remix/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(analysis),
+        signal: fetchSignal,
+      });
+
+      if (!isActive()) return;
+      if (response.status === 499) return;
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!isActive()) return;
+        setRemixPlanError(data.error ?? "Could not build remake plan.");
+        return;
+      }
+
+      const spec = (await response.json()) as RemixSpec;
+      if (!isActive()) return;
+      setRemixSpec(spec);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (!isActive()) return;
+        return;
+      }
+      if (!isActive()) return;
+      setRemixPlanError("Could not build remake plan.");
+    } finally {
+      if (remixPlanAbortRef.current === controller) {
+        setRemixPlanLoading(false);
+      }
+    }
+  }, [analysis]);
+
+  const pollRemixJob = useCallback(async (jobId: string, signal: AbortSignal) => {
+    const started = Date.now();
+    while (!signal.aborted) {
+      if (Date.now() - started > REMIX_RENDER_CLIENT_TIMEOUT_MS) {
+        throw new Error("Render took too long. Try again.");
+      }
+
+      const response = await fetch(`/api/remix/${jobId}`, { signal });
+      if (signal.aborted) return;
+
+      if (!response.ok) {
+        throw new Error("Could not read render status.");
+      }
+
+      const data = (await response.json()) as {
+        status: RemixJobStatus;
+        error?: string;
+      };
+      setRemixJobStatus(data.status);
+
+      if (data.status === "done") {
+        setRemixVideoUrl(`/api/remix/${jobId}/video?ts=${Date.now()}`);
+        return;
+      }
+      if (data.status === "failed") {
+        throw new Error(userFacingRemixError(data.error));
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, REMIX_RENDER_POLL_MS));
+    }
+  }, []);
+
+  const runRemixRender = useCallback(async () => {
+    if (!remixSpec) return;
+
+    remixPollAbortRef.current?.abort();
+    const controller = new AbortController();
+    remixPollAbortRef.current = controller;
+
+    setRemixRenderError(null);
+    setRemixVideoUrl(null);
+    setRemixJobId(null);
+    setRemixJobStatus(null);
+
+    const isActive = () =>
+      remixPollAbortRef.current === controller && !controller.signal.aborted;
+
+    try {
+      const response = await fetch("/api/remix/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(remixSpec),
+        signal: controller.signal,
+      });
+
+      if (!isActive()) return;
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!isActive()) return;
+        setRemixRenderError(data.error ?? "Could not start render.");
+        return;
+      }
+
+      const data = (await response.json()) as { jobId?: string };
+      if (!data.jobId || !isActive()) return;
+
+      setRemixJobId(data.jobId);
+      setRemixJobStatus("queued");
+      await pollRemixJob(data.jobId, controller.signal);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (!isActive()) return;
+        return;
+      }
+      if (!isActive()) return;
+      setRemixJobId(null);
+      setRemixJobStatus(null);
+      setRemixRenderError(
+        userFacingRemixError(
+          err instanceof Error ? err.message : undefined,
+        ),
+      );
+    } finally {
+      if (remixPollAbortRef.current === controller) {
+        remixPollAbortRef.current = null;
+      }
+    }
+  }, [pollRemixJob, remixSpec]);
+
+  const remixRenderBusy =
+    remixJobId !== null &&
+    remixJobStatus !== "done" &&
+    remixJobStatus !== "failed" &&
+    !remixVideoUrl;
+
+  function remixStatusLabel(): string {
+    switch (remixJobStatus) {
+      case "queued":
+        return "Starting render…";
+      case "generating":
+        return "Generating clips and voiceover…";
+      case "rendering":
+        return "Stitching in Remotion…";
+      default:
+        return "Making video…";
+    }
+  }
+
   return (
     <SiteShell isLanding>
       <div className="form-stage">
@@ -396,6 +619,130 @@ export default function Home() {
         {analysis ? (
           <div className="analysis-stage">
             <RecreatabilityCard analysis={analysis} />
+
+            {analysis.overallScore < REMIX_MIN_SCORE ? (
+              <p className="remix-gate-msg">
+                Score is too low to remake honestly with today&apos;s tools.
+              </p>
+            ) : (
+              <>
+                {!remixSpec ? (
+                  <>
+                    {remixPlanLoading ? (
+                      <div className="analyze-loading-card">
+                        <p className="analyze-loading-text">
+                          Building remake plan…
+                        </p>
+                        <button
+                          type="button"
+                          className="analyze-cancel-btn"
+                          onClick={cancelRemixPlan}
+                          aria-label="Cancel remake plan"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="remix-actions">
+                        <button
+                          type="button"
+                          className="btn btn-solid"
+                          onClick={() => void runRemixPlan()}
+                          disabled={remixPlanLoading}
+                        >
+                          Remake plan
+                        </button>
+                      </div>
+                    )}
+                    {remixPlanError ? (
+                      <p
+                        className="ingest-message ingest-message-error"
+                        role="alert"
+                      >
+                        {remixPlanError}
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <RemixPlanCard spec={remixSpec} />
+                    <div className="remix-actions">
+                      {!remixRenderBusy && !remixVideoUrl ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-solid"
+                            onClick={() => void runRemixRender()}
+                          >
+                            Make video
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => void runRemixPlan()}
+                            disabled={remixPlanLoading}
+                          >
+                            Regenerate plan
+                          </button>
+                        </>
+                      ) : null}
+                      {remixRenderBusy ? (
+                        <div className="analyze-loading-card">
+                          <p className="analyze-loading-text">
+                            {remixStatusLabel()}
+                          </p>
+                          <button
+                            type="button"
+                            className="analyze-cancel-btn"
+                            onClick={cancelRemixPoll}
+                            aria-label="Stop waiting for render"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {remixRenderError ? (
+                      <p
+                        className="ingest-message ingest-message-error"
+                        role="alert"
+                      >
+                        {remixRenderError}
+                      </p>
+                    ) : null}
+                    {remixVideoUrl ? (
+                      <div className="ingest-result">
+                        <p className="remix-result-label">Your remake</p>
+                        <video
+                          className="ingest-player"
+                          src={remixVideoUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="remix-actions">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => void runRemixRender()}
+                          >
+                            Make again
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => void runRemixPlan()}
+                            disabled={remixPlanLoading}
+                          >
+                            Regenerate plan
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </>
+            )}
           </div>
         ) : null}
       </div>

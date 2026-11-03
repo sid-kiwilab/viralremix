@@ -12,7 +12,7 @@ const STEPS = [
   },
   {
     title: "Remix",
-    body: "Later: generate a recreation. Not built.",
+    body: "When the score is 60+, use Remake plan on the home page to review clips, overlays, and voiceover. Make video runs EvoLink generation and a Remotion stitch; your remake plays below the source. npm run remix is still available headless for the same pipeline.",
   },
 ] as const;
 
